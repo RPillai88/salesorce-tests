@@ -22,6 +22,7 @@ test.describe.serial('Workflow 1', () => {
 
     test.beforeEach(async ({ page }) => {
         locators = new Locators(page);
+        console.log('launch url',FULL_URL!);
         await page.goto(FULL_URL!);
         await page.waitForLoadState('networkidle');
     });
@@ -96,8 +97,8 @@ test.describe.serial('Workflow 1', () => {
         workScheduleId = await locators.getWorkScheduleId();
         console.log('Work Schedule Name:', workScheduleId);
     });
-
-    test('Create and validate the report', async ({ page }) => {
+    test('Create and validate the report', async ({ page }, testInfo) => {
+        testInfo.retry = 3;
         await locators.reportsTab().click();
         await locators.newReportButton().click();
         await page.waitForLoadState('networkidle');
@@ -105,6 +106,9 @@ test.describe.serial('Workflow 1', () => {
         await expect(locators.createReportModalHeader()).toBeVisible();
         await expect(locators.createReportModalHeader()).toContainText('Create Report');
 
+        const categoryList = locators.reportTypeCategoryList();
+        console.log(`Number of report type categories: ${categoryList}`);
+        await expect(categoryList).toHaveCount(7);
         await locators.searchReportTypes().fill('Work Schedules with Change Request');
         await locators.searchReportTypes().press('Enter');
 
@@ -116,6 +120,7 @@ test.describe.serial('Workflow 1', () => {
         await locators.runReportButton().isHidden();
 
         const workScheduleIdExists = await locators.isWorkScheduleIdInReport(workScheduleId);
+        await page.waitForLoadState('networkidle');
         expect(workScheduleIdExists).toBe(true);
         await expect(locators.workScheduleIdHeader()).toContainText(workScheduleId);
     });

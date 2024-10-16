@@ -1,7 +1,7 @@
 import { expect, Page } from '@playwright/test';
 
 export class Locators {
-    constructor(private readonly page: Page) {}
+    constructor(private readonly page: Page) { }
 
     // Change Request page locators
     changeRequestsTab = () => this.page.locator('a[title="Change Requests"]');
@@ -83,33 +83,72 @@ export class Locators {
     newReportButton = () => this.page.locator('a[title="New Report"]');
     getReportIframe = () => this.page.frameLocator('iframe[title="Report Builder"]');
     createReportModalHeader = () => this.getReportIframe().locator('#dialog-heading');
+    reportTypeCategoryList = () => this.getReportIframe().locator('ul[role="listbox"] > li.slds-nav-vertical__item');
     reportTypeTableHeader = () => this.getReportIframe().locator('tr:has(th:has-text("Report Type Name"))');
     searchReportTypes = () => this.getReportIframe().locator('#modal-search-input');
     workSchedulesWithChangeRequestRow = () => this.getReportIframe().locator('tr.datarow.reportBuilder', {
         has: this.getReportIframe().locator('p.slds-truncate', { hasText: 'Work Schedules with Change Request' })
     });
     startReportButton = () => this.getReportIframe().locator('#start-report-btn');
-    workSchedulesWithChangeRequestBadge = () => this.getReportIframe().locator('span.slds-badge.dash-tag', { 
-        hasText: 'Work Schedules with Change Request' 
+    workSchedulesWithChangeRequestBadge = () => this.getReportIframe().locator('span.slds-badge.dash-tag', {
+        hasText: 'Work Schedules with Change Request'
     });
     runReportButton = () => this.getReportIframe().locator('button.slds-button_brand.action-bar-action-runReport', { hasText: 'Run' });
     reportTableCells = () => this.getReportIframe().locator('td.data-grid-table-cell');
 
+
+    workScheduleColumnHeader = () => this.getReportIframe().locator('div.wave-table-cell-measure-header span[title="Work Schedule: Info : Work Schedule: Schedule #"]');
+
+
     async isWorkScheduleIdInReport(workScheduleId: string): Promise<boolean> {
+        // Wait for the report to load
+        await this.page.waitForLoadState('networkidle');
+        await this.workScheduleColumnHeader().nth(1).waitFor({ state: 'visible' });
+        const headers = await this.workScheduleColumnHeader().all();
+        if (headers.length < 2) {
+            throw new Error('There is no second Work Schedule: Schedule # header');
+        }
+        await headers[1].click();
+        await this.page.waitForLoadState('networkidle');
+        await headers[1].click();
+        await this.page.waitForTimeout(10000);
+        await this.page.waitForLoadState('networkidle');
+
+        await this.reportTableCells().first().waitFor({ state: 'visible', timeout: 10000 });
+
         const cells = this.reportTableCells();
-        for (const cell of await cells.all()) {
-            if ((await cell.innerText()).includes(workScheduleId)) {
-                await cell.locator('a').click();
+        const allCells = await cells.all();
+        console.log(`Total number of cells in the report: ${allCells.length}`);
+
+        for (let i = 0; i < allCells.length; i++) {
+            const cell = allCells[i];
+            const cellText = await cell.innerText();
+            console.log(`Cell ${i + 1} text: ${cellText}`);
+
+            if (cellText.includes(workScheduleId)) {
+                console.log(`Work Schedule ID found in report at cell ${i + 1}`);
+                const link = cell.locator('a');
+                if (await link.isVisible()) {
+                    await link.click();
+                } else {
+                    console.log('Link not visible or not found in the cell');
+                }
                 return true;
             }
         }
+        console.log(`Work Schedule ID not found: ${workScheduleId}`);
         return false;
     }
 
     workScheduleIdHeader = () => this.page.locator('h1 slot[name="primaryField"] lightning-formatted-text');
-    
+
     async verifyWorkScheduleIdInHeader(workScheduleId: string): Promise<boolean> {
         const headerText = await this.workScheduleIdHeader().innerText();
         return headerText.includes(workScheduleId);
     }
+
+
+
 }
+
+
